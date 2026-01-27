@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Orçamento | iSelfie360</title>
+<style>
+:root { --cor-principal: #FFA500; --cor-hover: #FFD700; --cor-fundo: #ece5dd; --cor-whatsapp: #25D366; }
+html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--cor-fundo); font-family: 'Segoe UI', Arial, sans-serif; }
+.app-container { width: 100%; max-width: 500px; height: 100%; margin: 0 auto; background: #efeae2; display: flex; flex-direction: column; }
+.header { background: var(--cor-principal); color: #fff; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; position: relative; }
+.back-button { position: absolute; left: 15px; background: rgba(0,0,0,0.2); border: none; color: #fff; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 5px; text-decoration: none; }
+.back-button:hover { background: rgba(0,0,0,0.3); }
+#chat { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; scroll-behavior: smooth; }
+.bot, .user { max-width: 85%; padding: 12px 16px; border-radius: 15px; margin: 8px 0; line-height: 1.5; font-size: 15px; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.bot { background: #fff; align-self: flex-start; border-bottom-left-radius: 2px; }
+.user { background: #dcf8c6; align-self: flex-end; text-align: right; border-bottom-right-radius: 2px; }
+button { width: 100%; padding: 15px; margin-top: 10px; background: var(--cor-principal); color: #fff; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 16px; display: block; }
+button:hover { background: var(--cor-hover); }
+.grid-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.grid-botoes button { padding: 10px; font-size: 14px; margin-top: 0; }
+.whatsapp { background: var(--cor-whatsapp); margin-top: 20px; font-size: 18px; }
+input { width: 100%; padding: 15px; margin-top: 10px; border-radius: 12px; border: 2px solid #ddd; font-size: 16px; box-sizing: border-box; outline: none; }
+.pac-container { z-index: 9999 !important; border-radius: 10px; }
+.aviso-legal { font-size: 12px; color: #666; margin-top: 10px; display: block; line-height: 1.2; }
+</style>
+</head>
+<body>
+<div class="app-container">
+    <div class="header">
+        <a href="index.html" class="back-button">← Voltar</a>
+        <span>📸 iSelfie360 - Orçamento</span>
+    </div>
+    <div id="chat"></div>
+</div>
+<script>
+// ====================================
+// PROTEÇÃO DO CÓDIGO FONTE
+// ====================================
+
+// Desabilitar clique direito (sem alerta)
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+});
+
+// Bloquear teclas de atalho (sem alertas)
+document.addEventListener('keydown', function(e) {
+    // F12
+    if (e.keyCode === 123) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Ctrl+Shift+I (Inspecionar)
+    if (e.ctrlKey && e.shiftKey && e.keyCode === 73) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Ctrl+Shift+J (Console)
+    if (e.ctrlKey && e.shiftKey && e.keyCode === 74) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Ctrl+U (Ver código-fonte)
+    if (e.ctrlKey && e.keyCode === 85) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Ctrl+S (Salvar página)
+    if (e.ctrlKey && e.keyCode === 83) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Ctrl+Shift+C (Inspecionar elemento)
+    if (e.ctrlKey && e.shiftKey && e.keyCode === 67) {
+        e.preventDefault();
+        return false;
+    }
+});
+
+// Desabilitar arrastar texto/imagens
+document.addEventListener('dragstart', function(e) {
+    e.preventDefault();
+    return false;
+});
+
+// ====================================
+// CÓDIGO DO ASSISTENTE DE ORÇAMENTO
+// ====================================
+
+const chatDiv = document.getElementById("chat");
+const ORIGEM = "85851-020"; // CEP de Foz do Iguaçu
+const VALOR_KM = 2.5;
+let dados = { nome: "", telefone: "", servicos: [], local: "", convidados: 0, tipoEvento: "", dataEvento: "", km: 0, valorKm: 0, freteGratis: false };
+
+const precosBase = { 
+    "Plataforma 360°": 1000,
+    "Totem LED": 1000,
+    "Túnel Infinity": 1000
+};
+
+function maskTel(v) {
+    v = v.replace(/\D/g, "");
+    v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+    v = v.replace(/(\d)(\d{4})$/, "$1-$2");
+    return v;
+}
+
+function bot(t) { const d = document.createElement("div"); d.className = "bot"; d.innerHTML = t; chatDiv.appendChild(d); chatDiv.scrollTop = chatDiv.scrollHeight; }
+function user(t) { const d = document.createElement("div"); d.className = "user"; d.innerHTML = t; chatDiv.appendChild(d); chatDiv.scrollTop = chatDiv.scrollHeight; }
+
+function iniciarChat() {
+    bot("Olá! 😊 Bem-vindo à iSelfie360. Qual o seu <b>nome</b>?");
+    const input = document.createElement("input"); input.placeholder = "Seu nome";
+    const btn = document.createElement("button"); btn.innerText = "Próximo";
+    const div = document.createElement("div"); div.append(input, btn); chatDiv.appendChild(div);
+    btn.onclick = () => { if (input.value.length > 2) { dados.nome = input.value.toUpperCase(); user(dados.nome); div.remove(); pedirTelefone(); } };
+}
+
+function pedirTelefone() {
+    bot(`Prazer, ${dados.nome}! Informe seu <b>WhatsApp</b>:`);
+    const input = document.createElement("input"); 
+    input.type = "tel"; input.placeholder = "(00) 00000-0000"; input.maxLength = 15;
+    input.onkeyup = (e) => { e.target.value = maskTel(e.target.value); };
+    const btn = document.createElement("button"); btn.innerText = "Ver Equipamentos";
+    const div = document.createElement("div"); div.append(input, btn); chatDiv.appendChild(div);
+    btn.onclick = () => { 
+        const telLimpo = input.value.replace(/\D/g, "");
+        if (telLimpo.length >= 10) { dados.telefone = input.value; user(dados.telefone); div.remove(); selecionarEquipamento(); } 
+        else { alert("Por favor, digite o número completo com DDD."); }
+    };
+}
+
+function selecionarEquipamento() {
+    bot("Selecione os <b>equipamentos</b> que deseja:");
+    const equipamentosSelecionados = document.createElement("div");
+    equipamentosSelecionados.style.cssText = "background: #fff; padding: 10px; border-radius: 10px; margin: 10px 0; display: none;";
+    equipamentosSelecionados.innerHTML = "<b>Equipamentos selecionados:</b><br>";
+    chatDiv.appendChild(equipamentosSelecionados);
+    
+    Object.keys(precosBase).forEach(s => { 
+        const b = document.createElement("button"); 
+        b.innerText = s; 
+        b.onclick = () => { 
+            if (!dados.servicos.includes(s)) {
+                dados.servicos.push(s); 
+                user(s);
+                equipamentosSelecionados.style.display = "block";
+                equipamentosSelecionados.innerHTML = "<b>Equipamentos selecionados:</b><br>" + dados.servicos.join("<br>");
+                b.style.display = "none";
+            }
+        }; 
+        chatDiv.appendChild(b); 
+    });
+    
+    const btnContinuar = document.createElement("button");
+    btnContinuar.innerText = "✅ Continuar";
+    btnContinuar.style.background = "#444";
+    btnContinuar.style.marginTop = "20px";
+    btnContinuar.onclick = () => {
+        if (dados.servicos.length > 0) {
+            limparBotoes();
+            equipamentosSelecionados.remove();
+            pedirEndereco();
+        } else {
+            alert("Selecione pelo menos um equipamento!");
+        }
+    };
+    chatDiv.appendChild(btnContinuar);
+}
+
+function pedirEndereco() {
+    bot("Onde será o evento? 📍");
+    const input = document.createElement("input"); input.placeholder = "Rua, Buffet ou Cidade..."; chatDiv.appendChild(input);
+    const autocomplete = new google.maps.places.Autocomplete(input, { types: ['geocode', 'establishment'], fields: ['formatted_address'], componentRestrictions: { country: "br" } });
+    autocomplete.addListener("place_changed", () => { const place = autocomplete.getPlace(); if (place && place.formatted_address) { dados.local = place.formatted_address; input.disabled = true; user(dados.local); calcularDistancia(); } });
+}
+
+function calcularDistancia() {
+    bot("Calculando deslocamento... 🚗");
+    const service = new google.maps.DistanceMatrixService();
+    service.getDistanceMatrix({ origins: [ORIGEM], destinations: [dados.local], travelMode: "DRIVING" }, (res, status) => {
+        if (status === "OK" && res.rows[0].elements[0].status === "OK") {
+            const metros = res.rows[0].elements[0].distance.value;
+            dados.km = (metros / 1000).toFixed(1);
+            let multiplicador = dados.km > 100 ? 2 : 1;
+            let frete = (dados.km * VALOR_KM) * multiplicador;
+            if (frete < 100) { dados.valorKm = 0; dados.freteGratis = true; bot("🎁 Você GANHOU <b>FRETE GRÁTIS!</b>"); }
+            else { dados.valorKm = frete.toFixed(2); bot(`Distância: ${dados.km}km.`); }
+            bot("Quantos <b>convidados</b>?");
+            const input = document.createElement("input"); input.type = "number"; const btn = document.createElement("button"); btn.innerText = "Próximo";
+            const div = document.createElement("div"); div.append(input, btn); chatDiv.appendChild(div);
+            btn.onclick = () => { if (input.value > 0) { dados.convidados = parseInt(input.value); user(dados.convidados + " convidados"); div.remove(); perguntarTipoEvento(); } };
+        }
+    });
+}
+
+function perguntarTipoEvento() {
+    bot("Qual o <b>tipo de evento</b>?");
+    const input = document.createElement("input"); 
+    input.placeholder = "Ex: Casamento, Aniversário, 15 anos...";
+    const btn = document.createElement("button"); 
+    btn.innerText = "Próximo";
+    const div = document.createElement("div"); 
+    div.append(input, btn); 
+    chatDiv.appendChild(div);
+    btn.onclick = () => { 
+        if (input.value.length > 2) { 
+            dados.tipoEvento = input.value; 
+            user(dados.tipoEvento); 
+            div.remove(); 
+            pedirData(); 
+        } else {
+            alert("Por favor, informe o tipo de evento.");
+        }
+    };
+}
+
+function pedirData() {
+    bot("Qual a <b>data</b>?");
+    const input = document.createElement("input"); input.type = "date"; const btn = document.createElement("button"); btn.innerText = "Próximo";
+    const div = document.createElement("div"); div.append(input, btn); chatDiv.appendChild(div);
+    btn.onclick = () => { if (input.value) { const d = input.value.split('-'); dados.dataEvento = `${d[2]}/${d[1]}/${d[0]}`; user(dados.dataEvento); div.remove(); finalizar(); } };
+}
+
+function finalizar() {
+    let valorTotal = 0;
+    let listaEquipamentos = "";
+    
+    // Calcular valor de todos os equipamentos
+    dados.servicos.forEach(servico => {
+        let valorEquip = precosBase[servico];
+        
+        valorTotal += valorEquip;
+        listaEquipamentos += `📸 ${servico}: R$ ${valorEquip.toFixed(2)}<br>`;
+    });
+
+    let taxaConvidados = 0;
+    if (dados.convidados > 400) taxaConvidados = 200;
+    else if (dados.convidados > 300) taxaConvidados = 150;
+    else if (dados.convidados > 200) taxaConvidados = 100;
+
+    valorTotal += taxaConvidados + Number(dados.valorKm);
+
+    let linhaFrete = dados.freteGratis ? `🚗 Frete: 🎁 <b>GRÁTIS</b><br>` : `🚗 Frete: R$ ${dados.valorKm}<br>`;
+    
+    bot(`💰 <b>ORÇAMENTO FINAL</b><br><br>👤 ${dados.nome}<br>🎭 ${dados.tipoEvento}<br>📅 ${dados.dataEvento}<br>📍 ${dados.local}<br>👥 ${dados.convidados} convidados<br><br><b>EQUIPAMENTOS:</b><br>${listaEquipamentos}<br>${linhaFrete}${taxaConvidados > 0 ? `👥 Taxa Convidados: R$ ${taxaConvidados.toFixed(2)}<br>` : ""}<br><span style="font-size:22px;"><b>TOTAL: R$ ${valorTotal.toFixed(2)}</b></span><br><span class="aviso-legal">*Os valores e disponibilidade podem sofrer alterações sem aviso prévio.</span><br><button class="whatsapp" onclick="whats(${valorTotal})">💬 RESERVAR NO WHATSAPP</button>`);
+}
+
+function limparBotoes() { const btns = chatDiv.querySelectorAll("button"); btns.forEach(b => { if (!b.classList.contains("whatsapp")) b.style.display = "none" }); }
+
+function whats(v) {
+    const equipamentos = dados.servicos.join(", ");
+    const textoMensagem = `⭐ *NOVO ORÇAMENTO* ⭐\n\n` +
+                          `-------------------------------\n` +
+                          `👤 *Cliente:* ${dados.nome}\n` +
+                          `📱 *WhatsApp:* ${dados.telefone}\n` +
+                          `📅 *Data:* ${dados.dataEvento}\n` +
+                          `📍 *Local:* ${dados.local}\n` +
+                          `📸 *Equipamentos:* ${equipamentos}\n` +
+                          `👥 *Convidados:* ${dados.convidados}\n` +
+                          `🎭 *Tipo:* ${dados.tipoEvento}\n` +
+                          `🚗 *Frete:* ${dados.freteGratis ? "Grátis" : "R$ " + dados.valorKm}\n` +
+                          `-------------------------------\n` +
+                          `💰 *VALOR TOTAL: R$ ${v.toFixed(2)}*\n` +
+                          `-------------------------------`;
+
+    const msgEncoded = encodeURIComponent(textoMensagem);
+    window.open(`https://wa.me/554599496623?text=${msgEncoded}`, '_blank');
+}
+function initAddress() { iniciarChat(); }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBeZJBQmfgsfUhmMPazIU03mViwLscowIg&libraries=places&callback=initAddress" async defer></script>
+</body>
+</html>
