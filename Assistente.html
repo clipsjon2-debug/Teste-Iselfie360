@@ -21,7 +21,6 @@ button:hover { background: var(--cor-hover); }
 .grid-botoes button { padding: 10px; font-size: 14px; margin-top: 0; }
 .whatsapp { background: var(--cor-whatsapp); margin-top: 20px; font-size: 18px; }
 input { width: 100%; padding: 15px; margin-top: 10px; border-radius: 12px; border: 2px solid #ddd; font-size: 16px; box-sizing: border-box; outline: none; }
-.pac-container { z-index: 9999 !important; border-radius: 10px; }
 .aviso-legal { font-size: 12px; color: #666; margin-top: 10px; display: block; line-height: 1.2; }
 </style>
 </head>
@@ -94,9 +93,8 @@ document.addEventListener('dragstart', function(e) {
 // ====================================
 
 const chatDiv = document.getElementById("chat");
-const ORIGEM = "85851-020"; // CEP de Foz do Iguaçu
 const VALOR_KM = 2.5;
-let dados = { nome: "", telefone: "", servicos: [], local: "", convidados: 0, tipoEvento: "", dataEvento: "", km: 0, valorKm: 0, freteGratis: false };
+let dados = { nome: "", telefone: "", servicos: [], local: "", convidados: 0, tipoEvento: "", dataEvento: "" };
 
 const precosBase = { 
     "Plataforma 360°": 1000,
@@ -127,11 +125,11 @@ function pedirTelefone() {
     const input = document.createElement("input"); 
     input.type = "tel"; input.placeholder = "(00) 00000-0000"; input.maxLength = 15;
     input.onkeyup = (e) => { e.target.value = maskTel(e.target.value); };
-    const btn = document.createElement("button"); btn.innerText = "Ver Equipamentos";
+    const btn = document.createElement("button"); btn.innerText = "Próximo";
     const div = document.createElement("div"); div.append(input, btn); chatDiv.appendChild(div);
     btn.onclick = () => { 
         const telLimpo = input.value.replace(/\D/g, "");
-        if (telLimpo.length >= 10) { dados.telefone = input.value; user(dados.telefone); div.remove(); selecionarEquipamento(); } 
+        if (telLimpo.length >= 10) { dados.telefone = input.value; user(dados.telefone); div.remove(); pedirData(); } 
         else { alert("Por favor, digite o número completo com DDD."); }
     };
 }
@@ -159,14 +157,14 @@ function selecionarEquipamento() {
     });
     
     const btnContinuar = document.createElement("button");
-    btnContinuar.innerText = "✅ Continuar";
+    btnContinuar.innerText = "✅ Gerar Orçamento";
     btnContinuar.style.background = "#444";
     btnContinuar.style.marginTop = "20px";
     btnContinuar.onclick = () => {
         if (dados.servicos.length > 0) {
             limparBotoes();
             equipamentosSelecionados.remove();
-            pedirEndereco();
+            finalizar();
         } else {
             alert("Selecione pelo menos um equipamento!");
         }
@@ -175,29 +173,69 @@ function selecionarEquipamento() {
 }
 
 function pedirEndereco() {
-    bot("Onde será o evento? 📍");
-    const input = document.createElement("input"); input.placeholder = "Rua, Buffet ou Cidade..."; chatDiv.appendChild(input);
-    const autocomplete = new google.maps.places.Autocomplete(input, { types: ['geocode', 'establishment'], fields: ['formatted_address'], componentRestrictions: { country: "br" } });
-    autocomplete.addListener("place_changed", () => { const place = autocomplete.getPlace(); if (place && place.formatted_address) { dados.local = place.formatted_address; input.disabled = true; user(dados.local); calcularDistancia(); } });
+    bot("Onde será o evento? 📍<br><small>Digite o local do evento</small>");
+    const input = document.createElement("input"); 
+    input.placeholder = "Ex: Rua ABC, 123 - Centro, Foz do Iguaçu"; 
+    const btn = document.createElement("button"); 
+    btn.innerText = "Continuar";
+    const div = document.createElement("div"); 
+    div.append(input, btn); 
+    chatDiv.appendChild(div);
+    
+    btn.onclick = () => { 
+        if (input.value.length > 5) { 
+            dados.local = input.value; 
+            user(dados.local); 
+            div.remove(); 
+            perguntarConvidados(); 
+        } else {
+            alert("Por favor, informe o endereço ou local do evento.");
+        }
+    };
 }
 
-function calcularDistancia() {
-    bot("Calculando deslocamento... 🚗");
-    const service = new google.maps.DistanceMatrixService();
-    service.getDistanceMatrix({ origins: [ORIGEM], destinations: [dados.local], travelMode: "DRIVING" }, (res, status) => {
-        if (status === "OK" && res.rows[0].elements[0].status === "OK") {
-            const metros = res.rows[0].elements[0].distance.value;
-            dados.km = (metros / 1000).toFixed(1);
-            let multiplicador = dados.km > 100 ? 2 : 1;
-            let frete = (dados.km * VALOR_KM) * multiplicador;
-            if (frete < 100) { dados.valorKm = 0; dados.freteGratis = true; bot("🎁 Você GANHOU <b>FRETE GRÁTIS!</b>"); }
-            else { dados.valorKm = frete.toFixed(2); bot(`Distância: ${dados.km}km.`); }
-            bot("Quantos <b>convidados</b>?");
-            const input = document.createElement("input"); input.type = "number"; const btn = document.createElement("button"); btn.innerText = "Próximo";
-            const div = document.createElement("div"); div.append(input, btn); chatDiv.appendChild(div);
-            btn.onclick = () => { if (input.value > 0) { dados.convidados = parseInt(input.value); user(dados.convidados + " convidados"); div.remove(); perguntarTipoEvento(); } };
+function perguntarConvidados() {
+    bot("Quantos <b>convidados</b>?");
+    const input = document.createElement("input"); 
+    input.type = "number"; 
+    input.placeholder = "Número de convidados";
+    const btn = document.createElement("button"); 
+    btn.innerText = "Ver Equipamentos";
+    const div = document.createElement("div"); 
+    div.append(input, btn); 
+    chatDiv.appendChild(div);
+    btn.onclick = () => { 
+        if (input.value > 0) { 
+            dados.convidados = parseInt(input.value); 
+            user(dados.convidados + " convidados"); 
+            div.remove(); 
+            selecionarEquipamento(); 
+        } else {
+            alert("Por favor, informe o número de convidados.");
         }
-    });
+    };
+}
+
+function pedirData() {
+    bot("Qual a <b>data</b> do evento?");
+    const input = document.createElement("input"); 
+    input.type = "date"; 
+    const btn = document.createElement("button"); 
+    btn.innerText = "Próximo";
+    const div = document.createElement("div"); 
+    div.append(input, btn); 
+    chatDiv.appendChild(div);
+    btn.onclick = () => { 
+        if (input.value) { 
+            const d = input.value.split('-'); 
+            dados.dataEvento = `${d[2]}/${d[1]}/${d[0]}`; 
+            user(dados.dataEvento); 
+            div.remove(); 
+            perguntarTipoEvento(); 
+        } else {
+            alert("Por favor, selecione a data do evento.");
+        }
+    };
 }
 
 function perguntarTipoEvento() {
@@ -214,18 +252,11 @@ function perguntarTipoEvento() {
             dados.tipoEvento = input.value; 
             user(dados.tipoEvento); 
             div.remove(); 
-            pedirData(); 
+            pedirEndereco(); 
         } else {
             alert("Por favor, informe o tipo de evento.");
         }
     };
-}
-
-function pedirData() {
-    bot("Qual a <b>data</b>?");
-    const input = document.createElement("input"); input.type = "date"; const btn = document.createElement("button"); btn.innerText = "Próximo";
-    const div = document.createElement("div"); div.append(input, btn); chatDiv.appendChild(div);
-    btn.onclick = () => { if (input.value) { const d = input.value.split('-'); dados.dataEvento = `${d[2]}/${d[1]}/${d[0]}`; user(dados.dataEvento); div.remove(); finalizar(); } };
 }
 
 function finalizar() {
@@ -245,17 +276,16 @@ function finalizar() {
     else if (dados.convidados > 300) taxaConvidados = 150;
     else if (dados.convidados > 200) taxaConvidados = 100;
 
-    valorTotal += taxaConvidados + Number(dados.valorKm);
-
-    let linhaFrete = dados.freteGratis ? `🚗 Frete: 🎁 <b>GRÁTIS</b><br>` : `🚗 Frete: R$ ${dados.valorKm}<br>`;
+    valorTotal += taxaConvidados;
     
-    bot(`💰 <b>ORÇAMENTO FINAL</b><br><br>👤 ${dados.nome}<br>🎭 ${dados.tipoEvento}<br>📅 ${dados.dataEvento}<br>📍 ${dados.local}<br>👥 ${dados.convidados} convidados<br><br><b>EQUIPAMENTOS:</b><br>${listaEquipamentos}<br>${linhaFrete}${taxaConvidados > 0 ? `👥 Taxa Convidados: R$ ${taxaConvidados.toFixed(2)}<br>` : ""}<br><span style="font-size:22px;"><b>TOTAL: R$ ${valorTotal.toFixed(2)}</b></span><br><span class="aviso-legal">*Os valores e disponibilidade podem sofrer alterações sem aviso prévio.</span><br><button class="whatsapp" onclick="whats(${valorTotal})">💬 RESERVAR NO WHATSAPP</button>`);
+    bot(`💰 <b>ORÇAMENTO FINAL</b><br><br>👤 ${dados.nome}<br>🎭 ${dados.tipoEvento}<br>📅 ${dados.dataEvento}<br>📍 ${dados.local}<br>👥 ${dados.convidados} convidados<br><br><b>EQUIPAMENTOS:</b><br>${listaEquipamentos}<br>${taxaConvidados > 0 ? `👥 Taxa Convidados: R$ ${taxaConvidados.toFixed(2)}<br><br>` : "<br>"}<span style="font-size:22px;"><b>TOTAL: R$ ${valorTotal.toFixed(2)}</b></span><br><span class="aviso-legal">*Frete será calculado conforme a localização do evento.<br>*Os valores e disponibilidade podem sofrer alterações sem aviso prévio.</span><br><button class="whatsapp" onclick="whats(${valorTotal})">💬 RESERVAR NO WHATSAPP</button>`);
 }
 
 function limparBotoes() { const btns = chatDiv.querySelectorAll("button"); btns.forEach(b => { if (!b.classList.contains("whatsapp")) b.style.display = "none" }); }
 
 function whats(v) {
     const equipamentos = dados.servicos.join(", ");
+    
     const textoMensagem = `⭐ *NOVO ORÇAMENTO* ⭐\n\n` +
                           `-------------------------------\n` +
                           `👤 *Cliente:* ${dados.nome}\n` +
@@ -265,16 +295,17 @@ function whats(v) {
                           `📸 *Equipamentos:* ${equipamentos}\n` +
                           `👥 *Convidados:* ${dados.convidados}\n` +
                           `🎭 *Tipo:* ${dados.tipoEvento}\n` +
-                          `🚗 *Frete:* ${dados.freteGratis ? "Grátis" : "R$ " + dados.valorKm}\n` +
                           `-------------------------------\n` +
                           `💰 *VALOR TOTAL: R$ ${v.toFixed(2)}*\n` +
+                          `(+ frete conforme localização)\n` +
                           `-------------------------------`;
 
     const msgEncoded = encodeURIComponent(textoMensagem);
     window.open(`https://wa.me/554599496623?text=${msgEncoded}`, '_blank');
 }
-function initAddress() { iniciarChat(); }
+
+// Iniciar o chat quando a página carregar
+window.onload = iniciarChat;
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBeZJBQmfgsfUhmMPazIU03mViwLscowIg&libraries=places&callback=initAddress" async defer></script>
 </body>
 </html>
